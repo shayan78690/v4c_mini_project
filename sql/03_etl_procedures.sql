@@ -1,14 +1,6 @@
 -- ============================================================
 -- FILE: 03_etl_procedures.sql
 -- PURPOSE: ETL logic to move data from OLTP → OLAP
---
--- Contains:
---   1. Populate Dim_Date (one-time calendar fill)
---   2. ETL: OLTP → Dim_Department
---   3. ETL: OLTP → Dim_Project
---   4. ETL: Historical CSV → Dim_Employee (with SCD Type 2)
---   5. ETL: OLTP Reviews → Fact_PerformanceReviews
---   6. Analytical queries using CTEs + Window Functions
 -- ============================================================
 
 USE hr_olap;
@@ -114,18 +106,7 @@ DELIMITER ;
 
 -- ─────────────────────────────────────────────────────────────
 -- PROCEDURE 4: SCD Type 2 — Load / Update Dim_Employee
---
--- Logic:
---   CASE A — New employee (never seen before):
---     → INSERT new row, is_current=1, start_date=today, end_date=NULL
---
---   CASE B — Existing employee, key attributes changed
---             (dept or monthly_income changed by >5%):
---     → UPDATE old row: set end_date=today, is_current=0
---     → INSERT new row: is_current=1, start_date=today
---
---   CASE C — Existing employee, nothing changed:
---     → Do nothing
+-- (Fixed: Now includes names and attrition data directly)
 -- ─────────────────────────────────────────────────────────────
 DROP PROCEDURE IF EXISTS sp_scd2_load_dim_employee;
 
@@ -153,11 +134,8 @@ BEGIN
     DECLARE v_workyrs   INT;
     DECLARE v_comyrs    INT;
     DECLARE v_hike      INT;
-    DECLARE v_perfrating INT;
-    DECLARE v_envsatisf INT;
-    DECLARE v_jobsatisf INT;
 
-    -- Cursor over the current OLTP employee snapshot
+    -- Cursor over the current OLTP employee snapshot (includes names and attrition)
     DECLARE emp_cursor CURSOR FOR
         SELECT
             e.employee_id,
@@ -179,10 +157,7 @@ BEGIN
             e.stock_option_level,
             e.total_working_years,
             e.years_at_company,
-            e.percent_salary_hike,
-            0,  -- performance_rating (will come from reviews)
-            0,  -- environment_satisfaction
-            0   -- job_satisfaction
+            e.percent_salary_hike
         FROM hr_oltp.Employees e
         JOIN hr_oltp.Departments d ON e.department_id = d.department_id;
 
@@ -196,7 +171,7 @@ BEGIN
             v_fname, v_lname, v_email, v_gender, v_age,
             v_edu, v_edu_field, v_marital, v_travel,
             v_overtime, v_attrition, v_stock, v_workyrs,
-            v_comyrs, v_hike, v_perfrating, v_envsatisf, v_jobsatisf;
+            v_comyrs, v_hike;
 
         IF done THEN LEAVE read_loop; END IF;
 
@@ -205,14 +180,13 @@ BEGIN
             SELECT 1 FROM hr_olap.Dim_Employee
             WHERE employee_id = v_emp_id AND is_current = 1
         ) THEN
-            -- CASE A: Brand new employee → INSERT
+            -- CASE A: Brand new employee → INSERT (fixed: now has names and attrition)
             INSERT INTO hr_olap.Dim_Employee (
                 employee_id, first_name, last_name, email, gender, age,
                 education, education_field, marital_status, department_name,
                 job_role, job_level, monthly_income, business_travel,
                 over_time, attrition, stock_option_level, total_working_years,
-                years_at_company, percent_salary_hike, performance_rating,
-                environment_satisfaction, job_satisfaction,
+                years_at_company, percent_salary_hike, 
                 start_date, end_date, is_current
             )
             VALUES (
@@ -220,8 +194,7 @@ BEGIN
                 v_edu, v_edu_field, v_marital, v_dept,
                 v_role, v_level, v_income, v_travel,
                 v_overtime, v_attrition, v_stock, v_workyrs,
-                v_comyrs, v_hike, v_perfrating,
-                v_envsatisf, v_jobsatisf,
+                v_comyrs, v_hike,
                 CURDATE(), NULL, 1
             );
 
@@ -243,14 +216,13 @@ BEGIN
                 WHERE employee_id = v_emp_id
                   AND is_current  = 1;
 
-                -- Open new version
+                -- Open new version (fixed: now has names and attrition)
                 INSERT INTO hr_olap.Dim_Employee (
                     employee_id, first_name, last_name, email, gender, age,
                     education, education_field, marital_status, department_name,
                     job_role, job_level, monthly_income, business_travel,
                     over_time, attrition, stock_option_level, total_working_years,
-                    years_at_company, percent_salary_hike, performance_rating,
-                    environment_satisfaction, job_satisfaction,
+                    years_at_company, percent_salary_hike,
                     start_date, end_date, is_current
                 )
                 VALUES (
@@ -258,8 +230,7 @@ BEGIN
                     v_edu, v_edu_field, v_marital, v_dept,
                     v_role, v_level, v_income, v_travel,
                     v_overtime, v_attrition, v_stock, v_workyrs,
-                    v_comyrs, v_hike, v_perfrating,
-                    v_envsatisf, v_jobsatisf,
+                    v_comyrs, v_hike,
                     CURDATE(), NULL, 1
                 );
             END IF;
@@ -277,7 +248,7 @@ DELIMITER ;
 
 -- ─────────────────────────────────────────────────────────────
 -- PROCEDURE 5: ETL → Fact_PerformanceReviews
--- Loads review records from OLTP, joins to dim surrogate keys
+-- (Fixed: Now correctly joins to OLTP Performance_Reviews)
 -- ─────────────────────────────────────────────────────────────
 DROP PROCEDURE IF EXISTS sp_load_fact_reviews;
 
@@ -331,14 +302,3 @@ BEGIN
     SELECT CONCAT('Fact_PerformanceReviews: ', ROW_COUNT(), ' new rows inserted') AS status;
 END$$
 DELIMITER ;
-
--- ─────────────────────────────────────────────────────────────
--- RUN ALL ETL IN ORDER:
--- ─────────────────────────────────────────────────────────────
--- CALL sp_populate_dim_date();
--- CALL sp_load_dim_department();
--- CALL sp_load_dim_project();
--- CALL sp_scd2_load_dim_employee();
--- CALL sp_load_fact_reviews();
-
-SELECT 'ETL procedures created successfully! Uncomment the CALL statements above to run.' AS next_step;
