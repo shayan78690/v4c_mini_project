@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+data/employees_synthesized.csv
+data/employees_historical.csv
+.DS_Store
+*.egg-info/
+dist/
+build/
