@@ -191,7 +191,11 @@ def render():
             fig = px.timeline(
                 df_hist.assign(
                     start=pd.to_datetime(df_hist["start_date"]),
-                    end=pd.to_datetime(df_hist["end_date"].replace("Present", pd.Timestamp.today().strftime("%Y-%m-%d")))
+                    end=pd.to_datetime(
+                        df_hist["end_date"]
+                        .replace("Present", pd.Timestamp.today().strftime("%Y-%m-%d"))
+                        .fillna(pd.Timestamp.today().strftime("%Y-%m-%d"))
+                    )
                 ),
                 x_start="start", x_end="end",
                 y="department_name", color="job_role",

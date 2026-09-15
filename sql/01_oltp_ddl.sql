@@ -178,3 +178,4 @@ INSERT INTO Departments (department_name, location) VALUES
     ('Human Resources',         'Chicago');
 
 SELECT 'hr_oltp schema created successfully!' AS status;
+

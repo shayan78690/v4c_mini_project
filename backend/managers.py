@@ -16,11 +16,19 @@ Pattern:
 """
 
 from datetime import date, datetime
+import streamlit as st
 from backend.db_manager import DatabaseConnection
 from backend.models import (
     Department, Employee, Project,
     Review, ProjectAssignment
 )
+
+
+@st.cache_resource
+def get_db_connection():
+    db = DatabaseConnection()
+    db.connect("hr_oltp")
+    return db
 
 
 # ══════════════════════════════════════════════════════════════
@@ -34,9 +42,7 @@ class BaseManager:
     """
 
     def __init__(self):
-        self.db = DatabaseConnection()
-        if not self.db.is_alive():
-            self.db.connect("hr_oltp")   # default to OLTP
+        self.db = get_db_connection()
 
     def use_oltp(self):
         self.db.use_database("hr_oltp")
@@ -504,7 +510,12 @@ class AnalyticsManager(BaseManager):
     def get_top_performers(self, year: int = None, limit: int = 10) -> list[dict]:
         """Top performers per department using DENSE_RANK."""
         self.use_olap()
-        year_filter = f"AND f.review_year = {year}" if year else ""
+        if year:
+            year_filter = "AND f.review_year = %s"
+            params = (year, limit)
+        else:
+            year_filter = ""
+            params = (limit,)
         return self.db.fetch_all(f"""
             WITH ranked AS (
                 SELECT
@@ -529,9 +540,9 @@ class AnalyticsManager(BaseManager):
                     de.department_name, de.job_role, de.job_level, de.monthly_income
             )
             SELECT * FROM ranked
-            WHERE dept_rank <= {limit}
+            WHERE dept_rank <= %s
             ORDER BY department_name, dept_rank
-        """)
+        """, params)
 
     def get_attrition_risk(self) -> list[dict]:
         """Risk-scored employees using NTILE."""

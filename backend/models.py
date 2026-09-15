@@ -103,6 +103,8 @@ class Employee:
             errors.append("Job level must be 1–5.")
         if self.monthly_income <= 0:
             errors.append("Monthly income must be positive.")
+        if not self.department_id or self.department_id <= 0:
+            errors.append("A valid department must be selected.")
         if self.gender not in ("Male", "Female", "Other"):
             errors.append("Gender must be Male, Female, or Other.")
         if self.attrition not in ("Yes", "No"):
@@ -236,7 +238,7 @@ class Review:
 
     @property
     def rating_label(self) -> str:
-        mapping = {1: "Poor", 2: "Below Average", 3: "Excellent", 4: "Outstanding"}
+        mapping = {1: "Poor", 2: "Below Average", 3: "Good", 4: "Outstanding"}
         return mapping.get(self.performance_rating, "Unknown")
 
     # ── Validation ────────────────────────────────────────────

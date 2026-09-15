@@ -1,7 +1,15 @@
 """streamlit_app/app.py — Main entry point"""
 import streamlit as st
 import sys, os
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# ── Write ca.pem from Streamlit secrets (for cloud deployment) ──
+if "DB_SSL_CA_CONTENT" in st.secrets:
+    ca_path = os.path.join(os.path.dirname(__file__), "..", "ca.pem")
+    with open(ca_path, "w") as f:
+        f.write(st.secrets["DB_SSL_CA_CONTENT"])
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -60,7 +68,6 @@ div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within 
 with st.sidebar:
     st.markdown("<h2 style='text-align: center; margin-bottom: 20px;'>TalentTrace</h2>", unsafe_allow_html=True)
     
-    # Restored native radio buttons
     page = st.radio("Navigate", [
         "Home",
         "Onboard Employee",

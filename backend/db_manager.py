@@ -19,13 +19,22 @@ class DatabaseConnection:
             if self._connection and self._connection.open:
                 self._connection.close()
 
+            # Build SSL config — use ca.pem if available, else force SSL without cert
+            ssl_ca = os.getenv("DB_SSL_CA", "ca.pem")
+            if os.path.exists(ssl_ca):
+                ssl_config = {"ca": ssl_ca}
+            else:
+                # Force SSL without verifying cert (still encrypted)
+                ssl_config = {"ssl_disabled": False}
+
             self._connection = pymysql.connect(
-                host       = os.getenv("DB_HOST", "127.0.0.1"),
-                port       = int(os.getenv("DB_PORT", "3306")),
-                user       = os.getenv("DB_USER", "root"),
-                password   = os.getenv("DB_PASSWORD", ""),
-                database   = database,
-                autocommit = False,
+                host        = os.getenv("DB_HOST", "127.0.0.1"),
+                port        = int(os.getenv("DB_PORT", "3306")),
+                user        = os.getenv("DB_USER", "root"),
+                password    = os.getenv("DB_PASSWORD", ""),
+                database    = database,
+                ssl         = ssl_config,
+                autocommit  = False,
             )
         except Error as e:
             print(f"[DB ERROR] Connection failed: {e}")
@@ -36,7 +45,6 @@ class DatabaseConnection:
             self._connection.close()
 
     def use_database(self, database: str):
-        # Perform a clean reconnect to switch databases to prevent packet collisions
         self.connect(database)
 
     def execute(self, query: str, params: tuple = None) -> int:
@@ -103,4 +111,4 @@ class DatabaseConnection:
         try:
             return self._connection is not None and self._connection.open
         except Exception:
-            return Falses
+            return False

@@ -9,3 +9,5 @@ data/employees_historical.csv
 *.egg-info/
 dist/
 build/
+.streamlit/secrets.toml
+secrets.toml
